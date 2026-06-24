@@ -1,326 +1,294 @@
-# fraction_quest_game.py
-# Run with:
-# streamlit run fraction_quest_game.py
-
 import streamlit as st
 import random
+import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="Fraction Quest!",
-    page_icon="🏰",
-    layout="centered"
+    page_title="Fraction Mario Adventure",
+    page_icon="🍄",
+    layout="wide"
 )
 
-# --------------------------------------------------
-# GAME DATA
-# --------------------------------------------------
+st.title("🍄 Fraction Mario Adventure")
+st.write(
+    "Collect all the coins, then answer the fraction question to unlock the next level!"
+)
 
-SCENARIOS = [
-    ("🍕 Pizza Party", "pizza slices"),
-    ("🍰 Cake Shop", "cake pieces"),
-    ("🍎 Apple Basket", "apple baskets"),
-    ("🍫 Chocolate Factory", "chocolate bars"),
-    ("🍪 Cookie Jar", "cookies"),
-    ("🎨 Art Studio", "paint sections"),
-]
-
-# --------------------------------------------------
-# SESSION STATE
-# --------------------------------------------------
+# ------------------------------------------
+# Generate Question
+# ------------------------------------------
 
 if "score" not in st.session_state:
     st.session_state.score = 0
 
-if "lives" not in st.session_state:
-    st.session_state.lives = 3
-
 if "level" not in st.session_state:
     st.session_state.level = 1
 
-if "streak" not in st.session_state:
-    st.session_state.streak = 0
-
-if "answered" not in st.session_state:
-    st.session_state.answered = False
-
-if "game_over" not in st.session_state:
-    st.session_state.game_over = False
-
 if "question" not in st.session_state:
-    st.session_state.question = None
-
-
-# --------------------------------------------------
-# FUNCTIONS
-# --------------------------------------------------
-
-def make_question():
-
-    denominator = random.choice([2, 3, 4, 5, 6, 8])
-
-    # Increase difficulty with level
-    max_num = min(denominator - 1, 1 + st.session_state.level)
-
-    n1 = random.randint(1, max_num)
-    n2 = random.randint(1, max_num)
-
+    denom = random.choice([2, 3, 4, 5, 6, 8])
+    n1 = random.randint(1, denom - 1)
+    n2 = random.randint(1, denom - 1)
     operation = random.choice(["+", "-"])
 
-    # Prevent negative answers
     if operation == "-" and n2 > n1:
         n1, n2 = n2, n1
 
     answer = n1 + n2 if operation == "+" else n1 - n2
 
-    theme, item = random.choice(SCENARIOS)
-
-    if operation == "+":
-        story = (
-            f"Hero Max collected **{n1}/{denominator}** {item}. "
-            f"Later, he found another **{n2}/{denominator}**.\n\n"
-            f"How many {item} does Max have now?"
-        )
-    else:
-        story = (
-            f"Hero Max had **{n1}/{denominator}** {item}. "
-            f"He used **{n2}/{denominator}**.\n\n"
-            f"How many {item} are left?"
-        )
-
-    explanation = (
-        f"Keep the denominator **{denominator}** the same.\n\n"
-        f"{n1} {operation} {n2} = {answer}\n\n"
-        f"So the answer is **{answer}/{denominator}**."
-    )
-
-    return {
-        "theme": theme,
-        "story": story,
+    st.session_state.question = {
         "n1": n1,
         "n2": n2,
-        "denominator": denominator,
-        "operation": operation,
-        "answer": answer,
-        "explanation": explanation,
+        "denom": denom,
+        "op": operation,
+        "answer": answer
     }
-
-
-def new_question():
-    st.session_state.question = make_question()
-    st.session_state.answered = False
-
-
-def restart_game():
-    st.session_state.score = 0
-    st.session_state.lives = 3
-    st.session_state.level = 1
-    st.session_state.streak = 0
-    st.session_state.game_over = False
-    new_question()
-
-
-if st.session_state.question is None:
-    new_question()
 
 q = st.session_state.question
 
-# --------------------------------------------------
-# TITLE
-# --------------------------------------------------
+col1, col2 = st.columns(2)
+col1.metric("⭐ Score", st.session_state.score)
+col2.metric("🏆 Level", st.session_state.level)
 
-st.title("🏰 Fraction Quest")
-st.subheader("Become the Fraction Champion!")
+# ------------------------------------------
+# GAME AREA
+# ------------------------------------------
 
-# --------------------------------------------------
-# SCOREBOARD
-# --------------------------------------------------
+game_html = """
+<!DOCTYPE html>
+<html>
+<head>
+<style>
 
-c1, c2, c3, c4 = st.columns(4)
+body{
+    margin:0;
+    overflow:hidden;
+}
 
-c1.metric("⭐ Score", st.session_state.score)
-c2.metric("❤️ Lives", st.session_state.lives)
-c3.metric("🏆 Level", st.session_state.level)
-c4.metric("🔥 Streak", st.session_state.streak)
+#game{
+    position:relative;
+    width:100%;
+    height:400px;
+    background:linear-gradient(#87CEEB 70%, #8B4513 70%);
+    overflow:hidden;
+    border-radius:15px;
+}
+
+#ground{
+    position:absolute;
+    bottom:0;
+    width:100%;
+    height:100px;
+    background:#3CB371;
+}
+
+#player{
+    position:absolute;
+    bottom:100px;
+    left:50px;
+    width:50px;
+    height:50px;
+    background:red;
+    border-radius:10px;
+    font-size:35px;
+    text-align:center;
+}
+
+.coin{
+    position:absolute;
+    width:35px;
+    height:35px;
+    font-size:30px;
+}
+
+#message{
+    position:absolute;
+    top:10px;
+    left:10px;
+    font-size:24px;
+    background:white;
+    padding:10px;
+    border-radius:10px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="game">
+
+<div id="message">
+Coins: <span id="score">0</span>/5
+</div>
+
+<div id="player">🧒</div>
+
+<div class="coin" style="left:250px;bottom:120px;">🪙</div>
+<div class="coin" style="left:450px;bottom:120px;">🪙</div>
+<div class="coin" style="left:650px;bottom:180px;">🪙</div>
+<div class="coin" style="left:850px;bottom:120px;">🪙</div>
+<div class="coin" style="left:1050px;bottom:150px;">🪙</div>
+
+<div id="ground"></div>
+
+</div>
+
+<script>
+
+const player = document.getElementById("player");
+const coins = document.querySelectorAll(".coin");
+
+let x = 50;
+let y = 100;
+let velocity = 0;
+let jumping = false;
+let collected = 0;
+
+document.addEventListener("keydown", e=>{
+
+    if(e.key==="ArrowRight"){
+        x += 20;
+    }
+
+    if(e.key==="ArrowLeft"){
+        x -= 20;
+    }
+
+    if(e.code==="Space" && !jumping){
+        velocity = 18;
+        jumping = true;
+    }
+
+    player.style.left = x + "px";
+});
+
+function gameLoop(){
+
+    if(jumping){
+        y += velocity;
+        velocity -= 1;
+
+        if(y <= 100){
+            y = 100;
+            velocity = 0;
+            jumping = false;
+        }
+
+        player.style.bottom = y + "px";
+    }
+
+    coins.forEach(c=>{
+
+        if(c.style.display !== "none"){
+
+            let coinX = parseInt(c.style.left);
+
+            if(Math.abs(x - coinX) < 40 && Math.abs(y - 120) < 80){
+                c.style.display = "none";
+                collected++;
+
+                document.getElementById("score").innerText = collected;
+
+                if(collected === 5){
+                    document.getElementById("message").innerHTML =
+                    "🎉 Great! Scroll down and solve the fraction!";
+                }
+            }
+        }
+    });
+
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+
+</script>
+
+</body>
+</html>
+"""
+
+components.html(game_html, height=430)
 
 st.divider()
 
-# --------------------------------------------------
-# GAME OVER SCREEN
-# --------------------------------------------------
-
-if st.session_state.game_over:
-
-    st.error("Game Over!")
-
-    st.markdown(
-        f"""
-        ## Final Score: **{st.session_state.score}**
-
-        Great effort, Math Hero! 🎉
-        """
-    )
-
-    if st.button("🔄 Play Again"):
-        restart_game()
-        st.rerun()
-
-    st.stop()
-
-# --------------------------------------------------
-# MISSION
-# --------------------------------------------------
-
-st.markdown(f"## {q['theme']}")
-st.info(q["story"])
-
-st.markdown("### Solve this challenge")
+st.subheader("🧮 Fraction Gate Challenge")
 
 st.latex(
-    rf"\frac{{{q['n1']}}}{{{q['denominator']}}}"
-    rf"{q['operation']}"
-    rf"\frac{{{q['n2']}}}{{{q['denominator']}}}"
-    rf"=?"
+    rf"\frac{{{q['n1']}}}{{{q['denom']}}}"
+    rf"{q['op']}"
+    rf"\frac{{{q['n2']}}}{{{q['denom']}}}=?"
 )
 
-# --------------------------------------------------
-# ANSWER INPUT
-# --------------------------------------------------
-
-answer_num = st.number_input(
-    "Enter the numerator",
+num = st.number_input(
+    "Numerator",
     min_value=0,
-    max_value=30,
+    max_value=20,
     step=1
 )
 
-answer_den = st.number_input(
-    "Enter the denominator",
+den = st.number_input(
+    "Denominator",
     min_value=1,
-    max_value=12,
-    value=q["denominator"],
+    max_value=10,
+    value=q["denom"],
     step=1
 )
 
-# --------------------------------------------------
-# CHECK ANSWER
-# --------------------------------------------------
+if st.button("Unlock Next Level 🚪"):
 
-if not st.session_state.answered:
+    if num == q["answer"] and den == q["denom"]:
 
-    if st.button("⚔️ Submit Answer"):
+        st.success("🎉 Correct! Level unlocked!")
+        st.balloons()
 
-        st.session_state.answered = True
+        st.session_state.score += 10
+        st.session_state.level += 1
 
-        correct = (
-            answer_num == q["answer"]
-            and answer_den == q["denominator"]
+        denom = random.choice([2,3,4,5,6,8])
+        n1 = random.randint(1, denom-1)
+        n2 = random.randint(1, denom-1)
+
+        op = random.choice(["+","-"])
+
+        if op == "-" and n2 > n1:
+            n1, n2 = n2, n1
+
+        answer = n1 + n2 if op == "+" else n1 - n2
+
+        st.session_state.question = {
+            "n1": n1,
+            "n2": n2,
+            "denom": denom,
+            "op": op,
+            "answer": answer
+        }
+
+    else:
+        st.error("❌ Not quite.")
+
+        st.info(
+            f"""
+            Remember:
+
+            Keep the denominator the same.
+
+            Correct answer:
+
+            {q['answer']}/{q['denom']}
+            """
         )
 
-        if correct:
+st.sidebar.header("🎮 Controls")
+st.sidebar.write("➡️ Arrow Right = Move Right")
+st.sidebar.write("⬅️ Arrow Left = Move Left")
+st.sidebar.write("␣ Spacebar = Jump")
 
-            st.success("🎉 Correct! You defeated the challenge!")
-            st.balloons()
-
-            st.session_state.score += 10
-            st.session_state.streak += 1
-
-            # Level up every 5 correct answers
-            if st.session_state.streak % 5 == 0:
-                st.session_state.level += 1
-                st.success("🏆 LEVEL UP!")
-
-        else:
-
-            st.error("Oops! The challenge defeated you.")
-
-            st.session_state.lives -= 1
-            st.session_state.streak = 0
-
-            if st.session_state.lives <= 0:
-                st.session_state.game_over = True
-
-# --------------------------------------------------
-# FEEDBACK
-# --------------------------------------------------
-
-if st.session_state.answered:
-
-    correct = (
-        answer_num == q["answer"]
-        and answer_den == q["denominator"]
-    )
-
-    if not correct:
-        st.warning(
-            f"The correct answer was "
-            f"**{q['answer']}/{q['denominator']}**"
-        )
-
-    st.markdown("### 💡 Hint")
-    st.info(q["explanation"])
-
-    if st.button("➡️ Next Mission"):
-
-        if st.session_state.lives <= 0:
-            st.session_state.game_over = True
-
-        new_question()
-        st.rerun()
-
-# --------------------------------------------------
-# BADGES
-# --------------------------------------------------
-
-st.divider()
-st.markdown("## 🏅 Badges")
-
-badges = []
-
-if st.session_state.score >= 20:
-    badges.append("🥉 Bronze Fraction Hero")
-
-if st.session_state.score >= 50:
-    badges.append("🥈 Silver Fraction Hero")
-
-if st.session_state.score >= 100:
-    badges.append("🥇 Gold Fraction Champion")
-
-if not badges:
-    st.write("Earn points to unlock badges!")
-
-for badge in badges:
-    st.success(badge)
-
-# --------------------------------------------------
-# SIDEBAR RULES
-# --------------------------------------------------
-
-with st.sidebar:
-    st.header("🎮 How to Play")
-
-    st.markdown("""
-    1. Read the story.
-    2. Solve the fraction problem.
-    3. Enter the numerator and denominator.
-    4. Earn **10 points** for every correct answer.
-    5. You have **3 lives**.
-    6. Every 5 correct answers increases your level.
-    """)
-
-    st.header("📚 Remember")
-
-    st.markdown("""
-    **Like Fractions**
-
-    Keep the denominator the same.
-
-    Example:
-
-    3/8 + 2/8 = 5/8
-
-    6/10 - 2/10 = 4/10
-    """)
-
-    if st.button("🔄 Restart Game"):
-        restart_game()
-        st.rerun()
+st.sidebar.header("🏆 Goal")
+st.sidebar.write(
+    """
+    1. Collect coins.
+    2. Solve the fraction challenge.
+    3. Unlock the next level.
+    4. Earn points.
+    """
+)
