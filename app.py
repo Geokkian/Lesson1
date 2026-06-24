@@ -1,219 +1,326 @@
-# fractions_game.py
-# Streamlit Fraction Adventure Game
-# Ready to run with: streamlit run fractions_game.py
+# fraction_quest_game.py
+# Run with:
+# streamlit run fraction_quest_game.py
 
 import streamlit as st
 import random
 
 st.set_page_config(
-    page_title="Fraction Adventure!",
-    page_icon="🍕",
+    page_title="Fraction Quest!",
+    page_icon="🏰",
     layout="centered"
 )
 
-# ---------- Initialize Session State ----------
+# --------------------------------------------------
+# GAME DATA
+# --------------------------------------------------
+
+SCENARIOS = [
+    ("🍕 Pizza Party", "pizza slices"),
+    ("🍰 Cake Shop", "cake pieces"),
+    ("🍎 Apple Basket", "apple baskets"),
+    ("🍫 Chocolate Factory", "chocolate bars"),
+    ("🍪 Cookie Jar", "cookies"),
+    ("🎨 Art Studio", "paint sections"),
+]
+
+# --------------------------------------------------
+# SESSION STATE
+# --------------------------------------------------
+
 if "score" not in st.session_state:
     st.session_state.score = 0
 
-if "question_number" not in st.session_state:
-    st.session_state.question_number = 1
+if "lives" not in st.session_state:
+    st.session_state.lives = 3
 
-if "current_question" not in st.session_state:
-    st.session_state.current_question = None
+if "level" not in st.session_state:
+    st.session_state.level = 1
+
+if "streak" not in st.session_state:
+    st.session_state.streak = 0
 
 if "answered" not in st.session_state:
     st.session_state.answered = False
 
-if "feedback" not in st.session_state:
-    st.session_state.feedback = ""
+if "game_over" not in st.session_state:
+    st.session_state.game_over = False
 
-if "show_answer" not in st.session_state:
-    st.session_state.show_answer = False
+if "question" not in st.session_state:
+    st.session_state.question = None
 
 
-# ---------- Question Generator ----------
-def generate_question():
-    denominator = random.choice([2, 3, 4, 5, 6, 8, 10])
+# --------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------
 
-    # Ensure sensible numerators
-    num1 = random.randint(1, denominator - 1)
-    num2 = random.randint(1, denominator - 1)
+def make_question():
+
+    denominator = random.choice([2, 3, 4, 5, 6, 8])
+
+    # Increase difficulty with level
+    max_num = min(denominator - 1, 1 + st.session_state.level)
+
+    n1 = random.randint(1, max_num)
+    n2 = random.randint(1, max_num)
 
     operation = random.choice(["+", "-"])
 
-    if operation == "-":
-        # Make sure answer is not negative
-        if num2 > num1:
-            num1, num2 = num2, num1
+    # Prevent negative answers
+    if operation == "-" and n2 > n1:
+        n1, n2 = n2, n1
 
-        answer = num1 - num2
-        explanation = (
-            f"To subtract like fractions, keep the denominator ({denominator}) "
-            f"the same and subtract the numerators: "
-            f"{num1} - {num2} = {answer}."
+    answer = n1 + n2 if operation == "+" else n1 - n2
+
+    theme, item = random.choice(SCENARIOS)
+
+    if operation == "+":
+        story = (
+            f"Hero Max collected **{n1}/{denominator}** {item}. "
+            f"Later, he found another **{n2}/{denominator}**.\n\n"
+            f"How many {item} does Max have now?"
         )
-
     else:
-        answer = num1 + num2
-        explanation = (
-            f"To add like fractions, keep the denominator ({denominator}) "
-            f"the same and add the numerators: "
-            f"{num1} + {num2} = {answer}."
+        story = (
+            f"Hero Max had **{n1}/{denominator}** {item}. "
+            f"He used **{n2}/{denominator}**.\n\n"
+            f"How many {item} are left?"
         )
 
-    scenarios = [
-        (
-            f"🍕 Sam ate {num1}/{denominator} of a pizza and "
-            f"Tom ate {num2}/{denominator}. "
-            f"How much pizza did they eat altogether?"
-            if operation == "+"
-            else
-            f"🍰 Mia had {num1}/{denominator} of a cake and ate "
-            f"{num2}/{denominator}. How much cake is left?"
-        ),
-        (
-            f"🍎 Lily collected {num1}/{denominator} basket of apples "
-            f"and later {'found' if operation == '+' else 'gave away'} "
-            f"{num2}/{denominator} basket."
-        ),
-        (
-            f"🎨 A painting was coloured {num1}/{denominator}. Then "
-            f"{num2}/{denominator} was "
-            f"{'coloured more' if operation == '+' else 'erased'}."
-        )
-    ]
-
-    story = random.choice(scenarios)
+    explanation = (
+        f"Keep the denominator **{denominator}** the same.\n\n"
+        f"{n1} {operation} {n2} = {answer}\n\n"
+        f"So the answer is **{answer}/{denominator}**."
+    )
 
     return {
-        "num1": num1,
-        "num2": num2,
+        "theme": theme,
+        "story": story,
+        "n1": n1,
+        "n2": n2,
         "denominator": denominator,
         "operation": operation,
         "answer": answer,
-        "story": story,
-        "explanation": explanation
+        "explanation": explanation,
     }
 
 
-if st.session_state.current_question is None:
-    st.session_state.current_question = generate_question()
+def new_question():
+    st.session_state.question = make_question()
+    st.session_state.answered = False
 
-q = st.session_state.current_question
 
-# ---------- Header ----------
-st.title("🎮 Fraction Adventure!")
-st.subheader("Learn to Add and Subtract Like Fractions")
+def restart_game():
+    st.session_state.score = 0
+    st.session_state.lives = 3
+    st.session_state.level = 1
+    st.session_state.streak = 0
+    st.session_state.game_over = False
+    new_question()
 
-st.markdown(
-    """
-    Welcome, Math Explorer! 🚀
 
-    Solve the fraction challenge and earn points!
-    """
-)
+if st.session_state.question is None:
+    new_question()
 
-# ---------- Scoreboard ----------
-col1, col2 = st.columns(2)
+q = st.session_state.question
 
-with col1:
-    st.metric("⭐ Score", st.session_state.score)
+# --------------------------------------------------
+# TITLE
+# --------------------------------------------------
 
-with col2:
-    st.metric("📝 Question", st.session_state.question_number)
+st.title("🏰 Fraction Quest")
+st.subheader("Become the Fraction Champion!")
+
+# --------------------------------------------------
+# SCOREBOARD
+# --------------------------------------------------
+
+c1, c2, c3, c4 = st.columns(4)
+
+c1.metric("⭐ Score", st.session_state.score)
+c2.metric("❤️ Lives", st.session_state.lives)
+c3.metric("🏆 Level", st.session_state.level)
+c4.metric("🔥 Streak", st.session_state.streak)
 
 st.divider()
 
-# ---------- Question ----------
-st.markdown("### Story Problem")
+# --------------------------------------------------
+# GAME OVER SCREEN
+# --------------------------------------------------
+
+if st.session_state.game_over:
+
+    st.error("Game Over!")
+
+    st.markdown(
+        f"""
+        ## Final Score: **{st.session_state.score}**
+
+        Great effort, Math Hero! 🎉
+        """
+    )
+
+    if st.button("🔄 Play Again"):
+        restart_game()
+        st.rerun()
+
+    st.stop()
+
+# --------------------------------------------------
+# MISSION
+# --------------------------------------------------
+
+st.markdown(f"## {q['theme']}")
 st.info(q["story"])
 
-st.markdown("### Fraction Challenge")
+st.markdown("### Solve this challenge")
 
 st.latex(
-    rf"\frac{{{q['num1']}}}{{{q['denominator']}}}"
+    rf"\frac{{{q['n1']}}}{{{q['denominator']}}}"
     rf"{q['operation']}"
-    rf"\frac{{{q['num2']}}}{{{q['denominator']}}}"
+    rf"\frac{{{q['n2']}}}{{{q['denominator']}}}"
     rf"=?"
 )
 
-st.write("Enter your answer:")
+# --------------------------------------------------
+# ANSWER INPUT
+# --------------------------------------------------
 
 answer_num = st.number_input(
-    "Numerator",
+    "Enter the numerator",
     min_value=0,
-    max_value=50,
-    step=1,
-    key="num_input"
+    max_value=30,
+    step=1
 )
 
 answer_den = st.number_input(
-    "Denominator",
+    "Enter the denominator",
     min_value=1,
-    max_value=20,
-    step=1,
+    max_value=12,
     value=q["denominator"],
-    key="den_input"
+    step=1
 )
 
-# ---------- Check Answer ----------
+# --------------------------------------------------
+# CHECK ANSWER
+# --------------------------------------------------
+
 if not st.session_state.answered:
-    if st.button("✅ Check My Answer"):
+
+    if st.button("⚔️ Submit Answer"):
+
         st.session_state.answered = True
 
-        if (
+        correct = (
             answer_num == q["answer"]
             and answer_den == q["denominator"]
-        ):
-            st.session_state.score += 10
-            st.session_state.feedback = (
-                "🎉 Correct! Great job, Fraction Hero!"
-            )
-        else:
-            st.session_state.feedback = (
-                "❌ Not quite. Keep trying!"
-            )
-
-# ---------- Feedback ----------
-if st.session_state.answered:
-    if (
-        answer_num == q["answer"]
-        and answer_den == q["denominator"]
-    ):
-        st.success(st.session_state.feedback)
-        st.balloons()
-    else:
-        st.error(st.session_state.feedback)
-
-        st.warning(
-            f"The correct answer is "
-            f"{q['answer']}/{q['denominator']}"
         )
 
-    st.markdown("### 💡 Explanation")
+        if correct:
+
+            st.success("🎉 Correct! You defeated the challenge!")
+            st.balloons()
+
+            st.session_state.score += 10
+            st.session_state.streak += 1
+
+            # Level up every 5 correct answers
+            if st.session_state.streak % 5 == 0:
+                st.session_state.level += 1
+                st.success("🏆 LEVEL UP!")
+
+        else:
+
+            st.error("Oops! The challenge defeated you.")
+
+            st.session_state.lives -= 1
+            st.session_state.streak = 0
+
+            if st.session_state.lives <= 0:
+                st.session_state.game_over = True
+
+# --------------------------------------------------
+# FEEDBACK
+# --------------------------------------------------
+
+if st.session_state.answered:
+
+    correct = (
+        answer_num == q["answer"]
+        and answer_den == q["denominator"]
+    )
+
+    if not correct:
+        st.warning(
+            f"The correct answer was "
+            f"**{q['answer']}/{q['denominator']}**"
+        )
+
+    st.markdown("### 💡 Hint")
     st.info(q["explanation"])
 
-    if st.button("➡️ Next Question"):
-        st.session_state.question_number += 1
-        st.session_state.current_question = generate_question()
-        st.session_state.answered = False
-        st.session_state.feedback = ""
+    if st.button("➡️ Next Mission"):
+
+        if st.session_state.lives <= 0:
+            st.session_state.game_over = True
+
+        new_question()
         st.rerun()
 
+# --------------------------------------------------
+# BADGES
+# --------------------------------------------------
+
 st.divider()
+st.markdown("## 🏅 Badges")
 
-st.markdown(
-    """
-    ### 🌟 How to Add or Subtract Like Fractions
+badges = []
 
-    * Keep the denominator the same.
-    * Add or subtract only the numerators.
-    * Write the answer with the same denominator.
+if st.session_state.score >= 20:
+    badges.append("🥉 Bronze Fraction Hero")
+
+if st.session_state.score >= 50:
+    badges.append("🥈 Silver Fraction Hero")
+
+if st.session_state.score >= 100:
+    badges.append("🥇 Gold Fraction Champion")
+
+if not badges:
+    st.write("Earn points to unlock badges!")
+
+for badge in badges:
+    st.success(badge)
+
+# --------------------------------------------------
+# SIDEBAR RULES
+# --------------------------------------------------
+
+with st.sidebar:
+    st.header("🎮 How to Play")
+
+    st.markdown("""
+    1. Read the story.
+    2. Solve the fraction problem.
+    3. Enter the numerator and denominator.
+    4. Earn **10 points** for every correct answer.
+    5. You have **3 lives**.
+    6. Every 5 correct answers increases your level.
+    """)
+
+    st.header("📚 Remember")
+
+    st.markdown("""
+    **Like Fractions**
+
+    Keep the denominator the same.
 
     Example:
 
-    **3/8 + 2/8 = 5/8**
+    3/8 + 2/8 = 5/8
 
-    Happy learning! 🎓
-    """
-)
+    6/10 - 2/10 = 4/10
+    """)
+
+    if st.button("🔄 Restart Game"):
+        restart_game()
+        st.rerun()
